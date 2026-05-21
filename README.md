@@ -1,173 +1,422 @@
-﻿# Alice Skill Backend (FastAPI)
+# Alice Office Skill — навык Яндекс Алисы для вызова сотрудников
 
-Минимальный production-ready backend для webhook навыка Яндекс Алисы.
+Система позволяет вызывать сотрудников в офисе через голосовые команды Яндекс Алисы.
 
-## Финальная структура
+Пример:
+
+> «Алиса, позови Ивана в бухгалтерию»
+
+Навык:
+
+1. Принимает запрос от Алисы
+2. Определяет сотрудника и кабинет
+3. Отправляет уведомление в notify-сервис
+4. Возвращает голосовой ответ
+
+---
+
+# Возможности
+
+* Вызов сотрудников голосом
+* Поиск сотрудника по имени
+* Привязка сотрудников к кабинетам
+* REST API
+* SQLite база данных
+* Docker и Docker Compose
+* Готово для деплоя
+* Поддержка webhook Яндекс Алисы
+* Локальный notify-agent для тестов
+
+---
+
+# Архитектура
 
 ```text
-.
+Яндекс Алиса
+       ↓
+Webhook (/alice)
+       ↓
+FastAPI backend
+       ↓
+Notify API
+       ↓
+Оповещение кабинета / колонки
+```
+
+---
+
+# Структура проекта
+
+```text
+alice-office-skill/
 ├── app.py
+├── notify_agent.py
 ├── requirements.txt
 ├── Dockerfile
+├── Dockerfile.notify
+├── docker-compose.yml
 ├── .env.example
 └── README.md
 ```
 
-## Что реализовано
+---
 
-- `POST /alice` - webhook для Яндекс Диалогов.
-- `GET /health` - healthcheck.
-- Стабильная обработка пустых/битых запросов без падений.
-- Fallback-ответ при любой внутренней ошибке.
-- Логирование всех входящих запросов.
-- Формат ответа Алисы строго:
+# Технологии
+
+* Python 3.11
+* FastAPI
+* SQLite
+* Docker
+* Docker Compose
+* Requests
+* Yandex Dialogs API
+
+---
+
+# Установка
+
+## 1. Клонировать репозиторий
+
+```bash
+git clone https://github.com/USERNAME/alice-office-skill.git
+
+cd alice-office-skill
+```
+
+---
+
+# Локальный запуск без Docker
+
+## 1. Установить зависимости
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## 2. Создать .env
+
+Скопируй:
+
+```bash
+cp .env.example .env
+```
+
+---
+
+## 3. Запустить notify-agent
+
+```bash
+uvicorn notify_agent:app --host 0.0.0.0 --port 8001
+```
+
+---
+
+## 4. Запустить backend навыка
+
+В новом терминале:
+
+```bash
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+---
+
+# Проверка работы
+
+## Health check backend
+
+```text
+http://127.0.0.1:8000/health
+```
+
+---
+
+## Health check notify-agent
+
+```text
+http://127.0.0.1:8001/health
+```
+
+---
+
+# Тест навыка через PowerShell
+
+```powershell
+$body = @{
+  session = @{
+    new = $true
+    session_id = "test-session"
+    message_id = 1
+    user_id = "test-user"
+  }
+
+  request = @{
+    command = "позови ивана в бухгалтерию"
+    original_utterance = "позови ивана в бухгалтерию"
+    type = "SimpleUtterance"
+  }
+
+  version = "1.0"
+} | ConvertTo-Json -Depth 10
+
+Invoke-WebRequest `
+  -Uri "http://127.0.0.1:8000/alice" `
+  -Method POST `
+  -Body $body `
+  -ContentType "application/json"
+```
+
+---
+
+# Пример ответа
 
 ```json
 {
   "response": {
-    "text": "...",
+    "text": "Запрос принят. Я позову Ивана в Бухгалтерия.",
+    "tts": "Запрос принят. Я позову Ивана в Бухгалтерия.",
     "end_session": false
   },
   "version": "1.0"
 }
 ```
 
-## Локальный запуск
+---
+
+# Локальное уведомление
+
+Notify-agent выводит сообщение в консоль:
+
+```text
+=== OFFICE NOTIFY ===
+target: room:бухгалтерия
+message: Иван, вас зовет босс. Подойдите, пожалуйста.
+=====================
+```
+
+---
+
+# Запуск через Docker
+
+## Сборка и запуск
+
+```bash
+docker compose up --build
+```
+
+---
+
+# Порты
+
+| Сервис        | Порт |
+| ------------- | ---- |
+| Alice backend | 8000 |
+| Notify agent  | 8001 |
+
+---
+
+# Подключение к Яндекс Алисе
+
+## 1. Открыть
+
+```text
+https://dialogs.yandex.ru
+```
+
+---
+
+## 2. Создать навык
+
+Тип:
+
+```text
+Навык для Алисы
+```
+
+---
+
+## 3. Указать Backend
+
+Backend → Webhook URL
+
+---
+
+## 4. Вставить URL
+
+Например:
+
+```text
+https://YOUR_DOMAIN/alice
+```
+
+---
+
+# Для локального тестирования
+
+Используй ngrok.
+
+---
+
+## Установка ngrok
+
+Сайт:
+
+```text
+https://ngrok.com
+```
+
+---
+
+## Запуск
+
+```bash
+ngrok http 8000
+```
+
+---
+
+## Получишь URL
+
+```text
+https://abc123.ngrok-free.app
+```
+
+---
+
+## Вставить в Алису
+
+```text
+https://abc123.ngrok-free.app/alice
+```
+
+---
+
+# База данных
+
+Используется SQLite:
+
+```text
+office_calls.db
+```
+
+---
+
+# Таблицы
+
+## rooms
+
+Кабинеты офиса
+
+---
+
+## employees
+
+Сотрудники
+
+---
+
+## calls
+
+История вызовов
+
+---
+
+# Примеры команд
+
+## Вызов сотрудника
+
+```text
+Позови Ивана в бухгалтерию
+```
+
+---
+
+## Поиск сотрудника
+
+```text
+Где сейчас Анна
+```
+
+---
+
+## Помощь
+
+```text
+Помощь
+```
+
+---
+
+# Переменные окружения
+
+## .env
+
+```env
+DB_PATH=office_calls.db
+
+OFFICE_NOTIFY_API_URL=http://127.0.0.1:8001/speak
+
+OFFICE_NOTIFY_API_KEY=local-test-key
+
+LOG_LEVEL=INFO
+```
+
+---
+
+# Production deploy
+
+Можно развернуть:
+
+* Render
+* Railway
+* VPS
+* Docker
+* Yandex Cloud
+* Kubernetes
+
+---
+
+# Render deploy
+
+## Build command
 
 ```bash
 pip install -r requirements.txt
-uvicorn app:app --host 0.0.0.0 --port 8080
 ```
 
-Проверка:
+---
+
+## Start command
 
 ```bash
-curl http://localhost:8080/health
+uvicorn app:app --host 0.0.0.0 --port 10000
 ```
 
-## Docker
+---
 
-```bash
-docker build -t alice-skill:local .
-docker run --rm -p 8080:8080 alice-skill:local
-```
+# Безопасность
 
-## Deploy в Yandex Cloud Serverless Containers
+Рекомендуется:
 
-Замените:
-- `<folder-id>` - ID папки
-- `<registry-id>` - ID Container Registry (например `crp...`)
+* добавить API authentication
+* ограничить IP
+* вынести SQLite в PostgreSQL
+* хранить секреты через ENV
+* использовать HTTPS
 
-### 1) Подготовка окружения
+---
 
-```bash
-yc config set folder-id <folder-id>
-yc container registry configure-docker
-```
+# Roadmap
 
-### 2) Создание registry (если еще нет)
+Планируемые функции:
 
-```bash
-yc container registry create --name alice-registry
-yc container registry list
-```
-
-### 3) Сборка и публикация образа
-
-```bash
-docker build -t cr.yandex/<registry-id>/alice-skill:latest .
-docker push cr.yandex/<registry-id>/alice-skill:latest
-```
-
-### 4) Создание Serverless Container (если еще не создан)
-
-```bash
-yc serverless container create --name alice-skill
-```
-
-### 5) Деплой ревизии
-
-```bash
-yc serverless container revision deploy \
-  --container-name alice-skill \
-  --image cr.yandex/<registry-id>/alice-skill:latest \
-  --cores 1 \
-  --memory 512MB \
-  --execution-timeout 10s \
-  --concurrency 10 \
-  --environment LOG_LEVEL=INFO
-```
-
-Если образ приватный и нужен service account для pull:
-
-```bash
-yc serverless container revision deploy \
-  --container-name alice-skill \
-  --image cr.yandex/<registry-id>/alice-skill:latest \
-  --service-account-id <service-account-id> \
-  --cores 1 \
-  --memory 512MB \
-  --execution-timeout 10s \
-  --concurrency 10
-```
-
-### 6) Открыть публичный доступ для webhook
-
-```bash
-yc serverless container allow-unauthenticated-invoke alice-skill
-```
-
-### 7) Получить URL контейнера
-
-```bash
-yc serverless container get alice-skill
-```
-
-В ответе возьмите поле `url`, затем webhook для Dialogs:
-
-```text
-https://<container-url>/alice
-```
-
-Healthcheck URL:
-
-```text
-https://<container-url>/health
-```
-
-## Тестовый curl для Алисы
-
-```bash
-curl -X POST http://localhost:8080/alice \
-  -H "Content-Type: application/json" \
-  -d '{
-    "meta": {"locale": "ru-RU", "timezone": "Asia/Yekaterinburg"},
-    "session": {
-      "message_id": 0,
-      "session_id": "test-session-id",
-      "skill_id": "test-skill-id",
-      "user_id": "test-user-id",
-      "new": true
-    },
-    "request": {
-      "command": "привет",
-      "original_utterance": "привет",
-      "type": "SimpleUtterance"
-    },
-    "version": "1.0"
-  }'
-```
-
-## Подключение в dialogs.yandex.ru
-
-1. Откройте навыки в [dialogs.yandex.ru](https://dialogs.yandex.ru/).
-2. В настройках endpoint укажите `https://<container-url>/alice`.
-3. Сохраните и запустите проверку навыка.
-
-## Полезные ссылки (официальная документация)
-
-- Serverless Containers quickstart: https://yandex.cloud/en/docs/serverless-containers/quickstart/container
-- Container revision deploy (CLI): https://yandex.cloud/en/docs/cli/cli-ref/serverless/cli-ref/v0/container/revision/deploy
-- Allow unauthenticated invoke (CLI): https://yandex.cloud/en/docs/cli/cli-ref/serverless/cli-ref/container/allow-unauthenticated-invoke
-- Container Registry quickstart: https://yandex.cloud/en/docs/container-registry/quickstart/
-- Invocation link: https://yandex.cloud/en/docs/serverless-containers/operations/invocation-link
+* TTS в колонки
+* WebSocket уведомления
+* Telegram интеграция
+* Панель администратора
+* Авторизация
+* История вызовов
+* Push уведомления
+* AI маршрутизация сотрудников

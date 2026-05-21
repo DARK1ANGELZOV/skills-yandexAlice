@@ -1,0 +1,28 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8080"
+    environment:
+      DB_PATH: /data/office_calls.db
+      OFFICE_NOTIFY_API_URL: http://notify:8001/speak
+      OFFICE_NOTIFY_API_KEY: local-test-key
+      LOG_LEVEL: INFO
+    volumes:
+      - app_data:/data
+    depends_on:
+      - notify
+
+  notify:
+    build:
+      context: .
+      dockerfile: Dockerfile.notify
+    ports:
+      - "8001:8001"
+    environment:
+      LOG_LEVEL: INFO
+
+volumes:
+  app_data:
